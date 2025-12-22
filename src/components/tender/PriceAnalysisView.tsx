@@ -241,10 +241,19 @@ export default function PriceAnalysisView() {
           return;
         }
         
-      } catch (error) {
-        // Log the error and block the search to be safe
+      } catch (error: any) {
+        // Log the detailed error for debugging
         console.error('Failed to increment quota:', error);
-        alert('Failed to update search quota. Please try again or contact admin.');
+        console.error('Error details:', {
+          message: error?.message,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint,
+        });
+        
+        // Show more informative error message
+        const errorMessage = error?.message || 'Unknown error';
+        alert(`Failed to update search quota: ${errorMessage}. Please check console for details or contact admin.`);
         return;
       }
     }

@@ -105,10 +105,19 @@ export default function SalesHistoryView() {
           return;
         }
         
-      } catch (error) {
+      } catch (error: any) {
+        // Log the detailed error for debugging
         console.error('Failed to increment quota:', error);
-        // Block the search to be safe
-        alert('Failed to update search quota. Please try again or contact admin.');
+        console.error('Error details:', {
+          message: error?.message,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint,
+        });
+        
+        // Show more informative error message
+        const errorMessage = error?.message || 'Unknown error';
+        alert(`Failed to update search quota: ${errorMessage}. Please check console for details or contact admin.`);
         return;
       }
     }

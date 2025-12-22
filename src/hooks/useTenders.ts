@@ -159,16 +159,36 @@ export function useIncrementSearchQuota() {
 
   return useMutation({
     mutationFn: async (userId: string) => {
+      // Verify we have an authenticated user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Ensure the userId matches the authenticated user (for RLS policies)
+      if (userId !== authUser.id) {
+        console.warn('User ID mismatch:', { provided: userId, auth: authUser.id });
+        // Use the authenticated user ID instead
+        userId = authUser.id;
+      }
+
       const today = new Date().toISOString().split('T')[0];
 
-      const { data: existing } = await supabase
+      // Try to get existing quota
+      const { data: existing, error: selectError } = await supabase
         .from('tender_search_quotas')
         .select('*')
         .eq('user_id', userId)
         .eq('date', today)
         .maybeSingle();
 
+      if (selectError) {
+        console.error('Error fetching existing quota:', selectError);
+        throw selectError;
+      }
+
       if (existing) {
+        // Update existing quota
         const { data, error } = await supabase
           .from('tender_search_quotas')
           .update({
@@ -179,9 +199,13 @@ export function useIncrementSearchQuota() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating quota:', error);
+          throw error;
+        }
         return data;
       } else {
+        // Insert new quota record
         const { data, error } = await supabase
           .from('tender_search_quotas')
           .insert({
@@ -193,7 +217,10 @@ export function useIncrementSearchQuota() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error inserting quota:', error);
+          throw error;
+        }
         return data;
       }
     },
