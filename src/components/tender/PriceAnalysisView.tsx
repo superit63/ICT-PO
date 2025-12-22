@@ -219,29 +219,37 @@ export default function PriceAnalysisView() {
     // Create a unique key for this search
     const searchKey = `${selectedManufacturer || ''}-${selectedProduct || ''}-${selectedCapacity || ''}`;
     
-    // [FIX]: Removed the blocker. 
-    // Previously, if you clicked search twice on the same item, it would return here.
-    // Now we allow it so the quota counts and the user sees the system working.
-    // if (lastSearchRef.current === searchKey) return;
-    
     // Set hasSearched so filters are applied
     setHasSearched(true);
 
-    // 2. Increment quota
+    // 2. Increment quota and check if it exceeds limit AFTER incrementing
     if (permissions.hasSearchQuota && user?.id) {
       try {
-        await incrementQuota.mutateAsync(user.id);
+        // Increment the quota - this will create a record if it doesn't exist
+        const updatedQuotaData = await incrementQuota.mutateAsync(user.id);
         
-        // Update the UI immediately
-        await refetchQuota();
+        // The mutation's onSuccess already invalidates the query, but we refetch to get fresh data
+        const { data: updatedQuota } = await refetchQuota();
+        
+        // Use the data from mutation if refetch didn't return it yet
+        const finalQuota = updatedQuota || updatedQuotaData;
+        
+        // Check if quota is NOW exceeded after incrementing
+        // Use > (not >=) because if searches_used equals limit, that's the last allowed search
+        if (finalQuota && finalQuota.searches_used > finalQuota.searches_limit) {
+          alert('Daily search quota exceeded. Please contact admin for reset.');
+          return;
+        }
         
       } catch (error) {
-        // Log the error but allow the search to proceed (so we don't block users if DB glitched)
+        // Log the error and block the search to be safe
         console.error('Failed to increment quota:', error);
+        alert('Failed to update search quota. Please try again or contact admin.');
+        return;
       }
     }
 
-    // 3. Fetch data
+    // 3. Fetch data (only if quota check passed)
     const { data: freshTenders } = await refetch();
     
     // 4. Log the search history

@@ -17,7 +17,8 @@ export default function SalesHistoryView() {
   const permissions = useTenderPermissions();
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [manufacturer, setManufacturer] = useState('');
+  const [manufacturerSearch, setManufacturerSearch] = useState('');
+  const [selectedManufacturer, setSelectedManufacturer] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -36,10 +37,10 @@ export default function SalesHistoryView() {
     if (!hasSearched) return undefined;
     return {
       customerName: selectedCustomer || undefined,
-      manufacturer: manufacturer || undefined,
+      manufacturer: selectedManufacturer || undefined,
       productKeyword: selectedProduct || undefined,
     };
-  }, [selectedCustomer, manufacturer, selectedProduct, hasSearched]);
+  }, [selectedCustomer, selectedManufacturer, selectedProduct, hasSearched]);
 
   const { data: tenders, isLoading, refetch } = useTenders(filters);
 
@@ -49,6 +50,13 @@ export default function SalesHistoryView() {
       .filter((c) => c.toLowerCase().includes(customerSearch.toLowerCase()))
       .slice(0, 10);
   }, [customers, customerSearch]);
+
+  const filteredManufacturers = useMemo(() => {
+    if (!manufacturers || !manufacturerSearch) return [];
+    return manufacturers
+      .filter((m) => m.toLowerCase().includes(manufacturerSearch.toLowerCase()))
+      .slice(0, 10);
+  }, [manufacturers, manufacturerSearch]);
 
   const filteredProducts = useMemo(() => {
     if (!products || !productSearch) return [];
@@ -73,25 +81,39 @@ export default function SalesHistoryView() {
     }
 
     // Create a unique key for this search to prevent duplicate logs
-    const searchKey = `${selectedCustomer || ''}-${manufacturer || ''}-${selectedProduct || ''}`;
+    const searchKey = `${selectedCustomer || ''}-${selectedManufacturer || ''}-${selectedProduct || ''}`;
     
     // Set hasSearched first so filters are applied
     setHasSearched(true);
 
-    // Increment quota BEFORE search (only if quota is enabled)
-    // This should happen for EVERY search click, even if same parameters
+    // Increment quota and check if it exceeds limit AFTER incrementing
     if (permissions.hasSearchQuota && user?.id) {
       try {
-        await incrementQuota.mutateAsync(user.id);
-        // Explicitly refetch quota to update UI immediately
-        await refetchQuota();
+        // Increment the quota - this will create a record if it doesn't exist
+        const updatedQuotaData = await incrementQuota.mutateAsync(user.id);
+        
+        // The mutation's onSuccess already invalidates the query, but we refetch to get fresh data
+        const { data: updatedQuota } = await refetchQuota();
+        
+        // Use the data from mutation if refetch didn't return it yet
+        const finalQuota = updatedQuota || updatedQuotaData;
+        
+        // Check if quota is NOW exceeded after incrementing
+        // Use > (not >=) because if searches_used equals limit, that's the last allowed search
+        if (finalQuota && finalQuota.searches_used > finalQuota.searches_limit) {
+          alert('Daily search quota exceeded. Please contact admin for reset.');
+          return;
+        }
+        
       } catch (error) {
         console.error('Failed to increment quota:', error);
-        // Continue with search even if quota increment fails
+        // Block the search to be safe
+        alert('Failed to update search quota. Please try again or contact admin.');
+        return;
       }
     }
 
-    // Refetch with new filters and wait for results
+    // Refetch with new filters and wait for results (only if quota check passed)
     const { data: freshTenders } = await refetch();
     
     // Log the search with fresh results (only log if it's a new search to avoid duplicate logs)
@@ -100,7 +122,7 @@ export default function SalesHistoryView() {
       await logSearch.mutateAsync({
         user_id: user.id,
         customer_filter: selectedCustomer || undefined,
-        manufacturer_filter: manufacturer || undefined,
+        manufacturer_filter: selectedManufacturer || undefined,
         product_filter: selectedProduct || undefined,
         results_count: freshTenders?.length || 0,
       });
@@ -191,18 +213,35 @@ export default function SalesHistoryView() {
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Manufacturer
             </label>
-            <select
-              value={manufacturer}
-              onChange={(e) => setManufacturer(e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All</option>
-              {manufacturers?.map((m, idx) => (
-                <option key={idx} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search manufacturer..."
+                value={manufacturerSearch}
+                onChange={(e) => {
+                  setManufacturerSearch(e.target.value);
+                  setSelectedManufacturer('');
+                }}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            {manufacturerSearch && filteredManufacturers.length > 0 && (
+              <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredManufacturers.map((manufacturer, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedManufacturer(manufacturer);
+                      setManufacturerSearch(manufacturer);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 border-b border-slate-100 last:border-b-0"
+                  >
+                    {manufacturer}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -279,6 +318,9 @@ export default function SalesHistoryView() {
                       <h3 className="font-bold text-slate-900 text-lg mb-1">
                         {tender.customer_name}
                       </h3>
+                      <p className="text-xs text-slate-600 mb-2">
+                        {tender.tender_package_name}
+                      </p>
                       <div className="inline-block px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
                         {formatValue(tender.winning_value)} Tỷ
                       </div>
