@@ -33,6 +33,8 @@ export default function PriceAnalysisView() {
   const [selectedCapacity, setSelectedCapacity] = useState<number | ''>('');
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  
+  // Ref helps track previous searches, but we won't let it block execution anymore
   const lastSearchRef = useRef<string>('');
 
   const { data: quota, refetch: refetchQuota } = useTenderSearchQuota(user?.id);
@@ -198,44 +200,43 @@ export default function PriceAnalysisView() {
   const quotaExceeded =
     permissions.hasSearchQuota && quota && quota.searches_used >= quota.searches_limit;
 
+  // --- FIXED HANDLE SEARCH FUNCTION ---
   const handleSearch = async () => {
-    // Check quota BEFORE incrementing
+    // 1. Check if quota is ALREADY exceeded before starting
     if (quotaExceeded) {
       alert('Daily search quota exceeded. Please contact admin for reset.');
       return;
     }
 
-    // Create a unique key for this search to prevent duplicate logs
+    // Create a unique key for this search
     const searchKey = `${manufacturer || ''}-${selectedProduct || ''}-${selectedCapacity || ''}`;
     
-    // Only proceed if this is a new search
-    if (lastSearchRef.current === searchKey) return;
+    // [FIX]: Removed the blocker. 
+    // Previously, if you clicked search twice on the same item, it would return here.
+    // Now we allow it so the quota counts and the user sees the system working.
+    // if (lastSearchRef.current === searchKey) return;
     
-    // Set hasSearched first so filters are applied
+    // Set hasSearched so filters are applied
     setHasSearched(true);
 
-    // Increment quota BEFORE search (only if quota is enabled)
+    // 2. Increment quota
     if (permissions.hasSearchQuota && user?.id) {
       try {
         await incrementQuota.mutateAsync(user.id);
-        // Explicitly refetch quota to update UI immediately
-        const { data: updatedQuota } = await refetchQuota();
         
-        // Check quota again after incrementing
-        if (updatedQuota && updatedQuota.searches_used >= updatedQuota.searches_limit) {
-          alert('Daily search quota exceeded. Please contact admin for reset.');
-          return;
-        }
+        // Update the UI immediately
+        await refetchQuota();
+        
       } catch (error) {
+        // Log the error but allow the search to proceed (so we don't block users if DB glitched)
         console.error('Failed to increment quota:', error);
-        // Continue with search even if quota increment fails
       }
     }
 
-    // Refetch with new filters and wait for results
+    // 3. Fetch data
     const { data: freshTenders } = await refetch();
     
-    // Log the search with fresh results
+    // 4. Log the search history
     if (user?.id) {
       lastSearchRef.current = searchKey;
       await logSearch.mutateAsync({
