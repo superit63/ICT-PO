@@ -27,7 +27,8 @@ interface ProductPriceStats {
 export default function PriceAnalysisView() {
   const { user } = useAuth();
   const permissions = useTenderPermissions();
-  const [manufacturer, setManufacturer] = useState('');
+  const [manufacturerSearch, setManufacturerSearch] = useState('');
+  const [selectedManufacturer, setSelectedManufacturer] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedCapacity, setSelectedCapacity] = useState<number | ''>('');
@@ -45,16 +46,23 @@ export default function PriceAnalysisView() {
   const logSearch = useLogTenderSearch();
 
   const filters = useMemo(() => {
-    const hasFilters = manufacturer || selectedProduct || selectedCapacity;
+    const hasFilters = selectedManufacturer || selectedProduct || selectedCapacity;
     if (!hasFilters && !hasSearched) return undefined;
     return {
-      manufacturer: manufacturer || undefined,
+      manufacturer: selectedManufacturer || undefined,
       productKeyword: selectedProduct || undefined,
       capacity: selectedCapacity !== '' ? selectedCapacity as number : undefined,
     };
-  }, [manufacturer, selectedProduct, selectedCapacity, hasSearched]);
+  }, [selectedManufacturer, selectedProduct, selectedCapacity, hasSearched]);
 
   const { data: tenders, isLoading, refetch } = useTenders(filters);
+
+  const filteredManufacturers = useMemo(() => {
+    if (!manufacturers || !manufacturerSearch) return [];
+    return manufacturers
+      .filter((m) => m.toLowerCase().includes(manufacturerSearch.toLowerCase()))
+      .slice(0, 10);
+  }, [manufacturers, manufacturerSearch]);
 
   const filteredProducts = useMemo(() => {
     if (!products || !productSearch) return [];
@@ -209,7 +217,7 @@ export default function PriceAnalysisView() {
     }
 
     // Create a unique key for this search
-    const searchKey = `${manufacturer || ''}-${selectedProduct || ''}-${selectedCapacity || ''}`;
+    const searchKey = `${selectedManufacturer || ''}-${selectedProduct || ''}-${selectedCapacity || ''}`;
     
     // [FIX]: Removed the blocker. 
     // Previously, if you clicked search twice on the same item, it would return here.
@@ -241,7 +249,7 @@ export default function PriceAnalysisView() {
       lastSearchRef.current = searchKey;
       await logSearch.mutateAsync({
         user_id: user.id,
-        manufacturer_filter: manufacturer || undefined,
+        manufacturer_filter: selectedManufacturer || undefined,
         product_filter: selectedProduct || undefined,
         results_count: freshTenders?.length || 0,
       });
@@ -282,18 +290,35 @@ export default function PriceAnalysisView() {
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Manufacturer
             </label>
-            <select
-              value={manufacturer}
-              onChange={(e) => setManufacturer(e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All</option>
-              {manufacturers?.map((m, idx) => (
-                <option key={idx} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search manufacturer..."
+                value={manufacturerSearch}
+                onChange={(e) => {
+                  setManufacturerSearch(e.target.value);
+                  setSelectedManufacturer('');
+                }}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            {manufacturerSearch && filteredManufacturers.length > 0 && (
+              <div className="mt-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredManufacturers.map((manufacturer, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedManufacturer(manufacturer);
+                      setManufacturerSearch(manufacturer);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 border-b border-slate-100 last:border-b-0"
+                  >
+                    {manufacturer}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -414,7 +439,7 @@ export default function PriceAnalysisView() {
                   <div className="bg-blue-50 rounded-lg p-3">
                     <p className="text-xs text-slate-600 mb-1">Average</p>
                     <p className="text-lg font-bold text-blue-600">
-                      {formatPrice(stats.avgPrice)}
+                      {formatPrice(Math.ceil(stats.avgPrice))}
                     </p>
                   </div>
                   <div className="bg-amber-50 rounded-lg p-3">
@@ -500,19 +525,24 @@ export default function PriceAnalysisView() {
                         className="bg-slate-50 rounded-lg p-3 text-sm"
                       >
                         <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex-1">
                             <p className="font-semibold text-slate-900">
                               {tender.customer_name}
                             </p>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              {tender.tender_package_name}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2">
                             {typeLabel && (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${typeLabel.color}`}>
                                 {typeLabel.text}
                               </span>
                             )}
+                            <p className="text-xs text-slate-600 whitespace-nowrap">
+                              {tender.month}/{tender.year}
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-600">
-                            {tender.month}/{tender.year}
-                          </p>
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between items-center">

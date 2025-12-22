@@ -75,24 +75,16 @@ export default function SalesHistoryView() {
     // Create a unique key for this search to prevent duplicate logs
     const searchKey = `${selectedCustomer || ''}-${manufacturer || ''}-${selectedProduct || ''}`;
     
-    // Only proceed if this is a new search
-    if (lastSearchRef.current === searchKey) return;
-    
     // Set hasSearched first so filters are applied
     setHasSearched(true);
 
     // Increment quota BEFORE search (only if quota is enabled)
+    // This should happen for EVERY search click, even if same parameters
     if (permissions.hasSearchQuota && user?.id) {
       try {
         await incrementQuota.mutateAsync(user.id);
         // Explicitly refetch quota to update UI immediately
-        const { data: updatedQuota } = await refetchQuota();
-        
-        // Check quota again after incrementing
-        if (updatedQuota && updatedQuota.searches_used >= updatedQuota.searches_limit) {
-          alert('Daily search quota exceeded. Please contact admin for reset.');
-          return;
-        }
+        await refetchQuota();
       } catch (error) {
         console.error('Failed to increment quota:', error);
         // Continue with search even if quota increment fails
@@ -102,8 +94,8 @@ export default function SalesHistoryView() {
     // Refetch with new filters and wait for results
     const { data: freshTenders } = await refetch();
     
-    // Log the search with fresh results
-    if (user?.id) {
+    // Log the search with fresh results (only log if it's a new search to avoid duplicate logs)
+    if (user?.id && lastSearchRef.current !== searchKey) {
       lastSearchRef.current = searchKey;
       await logSearch.mutateAsync({
         user_id: user.id,
