@@ -46,8 +46,8 @@ export default function PriceAnalysisView() {
   const logSearch = useLogTenderSearch();
 
   const filters = useMemo(() => {
-    const hasFilters = selectedManufacturer || selectedProduct || selectedCapacity;
-    if (!hasFilters && !hasSearched) return undefined;
+    // Only apply filters after search button is clicked
+    if (!hasSearched) return undefined;
     return {
       manufacturer: selectedManufacturer || undefined,
       productKeyword: selectedProduct || undefined,
@@ -261,15 +261,20 @@ export default function PriceAnalysisView() {
     // 3. Fetch data (only if quota check passed)
     const { data: freshTenders } = await refetch();
     
-    // 4. Log the search history
+    // 4. Log the search history (don't block if logging fails)
     if (user?.id) {
       lastSearchRef.current = searchKey;
-      await logSearch.mutateAsync({
-        user_id: user.id,
-        manufacturer_filter: selectedManufacturer || undefined,
-        product_filter: selectedProduct || undefined,
-        results_count: freshTenders?.length || 0,
-      });
+      try {
+        await logSearch.mutateAsync({
+          user_id: user.id,
+          manufacturer_filter: selectedManufacturer || undefined,
+          product_filter: selectedProduct || undefined,
+          results_count: freshTenders?.length || 0,
+        });
+      } catch (error: any) {
+        // Log error but don't block the search
+        console.error('Failed to log search:', error);
+      }
     }
   };
 

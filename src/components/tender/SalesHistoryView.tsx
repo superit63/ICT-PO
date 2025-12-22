@@ -128,13 +128,18 @@ export default function SalesHistoryView() {
     // Log the search with fresh results (only log if it's a new search to avoid duplicate logs)
     if (user?.id && lastSearchRef.current !== searchKey) {
       lastSearchRef.current = searchKey;
-      await logSearch.mutateAsync({
-        user_id: user.id,
-        customer_filter: selectedCustomer || undefined,
-        manufacturer_filter: selectedManufacturer || undefined,
-        product_filter: selectedProduct || undefined,
-        results_count: freshTenders?.length || 0,
-      });
+      try {
+        await logSearch.mutateAsync({
+          user_id: user.id,
+          customer_filter: selectedCustomer || undefined,
+          manufacturer_filter: selectedManufacturer || undefined,
+          product_filter: selectedProduct || undefined,
+          results_count: freshTenders?.length || 0,
+        });
+      } catch (error: any) {
+        // Log error but don't block the search
+        console.error('Failed to log search:', error);
+      }
     }
   };
 

@@ -231,6 +231,8 @@ export function useIncrementSearchQuota() {
 }
 
 export function useLogTenderSearch() {
+  const queryClient = useQueryClient();
+  
   return useMutation({
     mutationFn: async (log: {
       user_id: string;
@@ -245,8 +247,15 @@ export function useLogTenderSearch() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to log tender search:', error);
+        throw error;
+      }
       return data;
+    },
+    onSuccess: () => {
+      // Invalidate the admin dashboard query so it shows new logs
+      queryClient.invalidateQueries({ queryKey: ['tender-search-logs-all'] });
     },
   });
 }
