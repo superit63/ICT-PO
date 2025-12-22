@@ -1,0 +1,78 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.doctors (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  hospital_id uuid NOT NULL,
+  department text,
+  doctor_role text,
+  phone text,
+  assigned_sales_id uuid NOT NULL,
+  status text DEFAULT 'active'::text,
+  last_visit_at timestamp with time zone,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT doctors_pkey PRIMARY KEY (id),
+  CONSTRAINT doctors_hospital_id_fkey FOREIGN KEY (hospital_id) REFERENCES public.hospitals(id),
+  CONSTRAINT doctors_assigned_sales_id_fkey FOREIGN KEY (assigned_sales_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.hospitals (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  city text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hospitals_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.product_knowledge (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id text NOT NULL,
+  title text NOT NULL,
+  content text NOT NULL,
+  category text DEFAULT 'general'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT product_knowledge_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  category text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT products_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  full_name text,
+  email text,
+  role text DEFAULT 'sale'::text CHECK (role = ANY (ARRAY['admin'::text, 'sale'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.sales_hospital_assignments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  sales_rep_id uuid NOT NULL,
+  hospital_id uuid NOT NULL,
+  CONSTRAINT sales_hospital_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT sales_hospital_assignments_sales_rep_id_fkey FOREIGN KEY (sales_rep_id) REFERENCES public.profiles(id),
+  CONSTRAINT sales_hospital_assignments_hospital_id_fkey FOREIGN KEY (hospital_id) REFERENCES public.hospitals(id)
+);
+CREATE TABLE public.tenders (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT tenders_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.visits (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  doctor_id uuid,
+  sales_id uuid,
+  visit_date timestamp with time zone DEFAULT now(),
+  outcome text,
+  notes text,
+  products_discussed ARRAY,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT visits_pkey PRIMARY KEY (id),
+  CONSTRAINT visits_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES public.doctors(id),
+  CONSTRAINT visits_sales_id_fkey FOREIGN KEY (sales_id) REFERENCES public.profiles(id)
+);
