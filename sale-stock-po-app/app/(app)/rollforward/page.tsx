@@ -7,9 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { exportRollforward, type RfResult } from "@/lib/export";
-import { formatMonth, statusColors, statusIcon, type StockStatus } from "@/lib/calculations";
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { formatMonth, statusColors, type StockStatus } from "@/lib/calculations";
+import { FileSpreadsheet, TriangleAlert as AlertTriangle, ArrowRight, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 type RFEntry = {
   month: string;
@@ -26,8 +26,6 @@ type RFData = {
   results: RfResult[];
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function fmtMonth(ym: string): string {
   return formatMonth(ym as `20${number}-${number}${number}`);
 }
@@ -39,7 +37,13 @@ const STATUS_BG: Record<string, string> = {
   stockout: "bg-red-50",
 };
 
-/** Build month selector options: current ± 3 months. */
+const STATUS_BAR: Record<string, string> = {
+  ok: "bg-green-400",
+  low: "bg-yellow-400",
+  critical: "bg-orange-400",
+  stockout: "bg-red-500",
+};
+
 function buildMonthOptions(current: string): string[] {
   const [y, m] = current.split("-").map(Number);
   return [-3, -2, -1, 0, 1, 2, 3].map((offset) => {
@@ -48,35 +52,28 @@ function buildMonthOptions(current: string): string[] {
   });
 }
 
-// ── Skeleton ─────────────────────────────────────────────────────────────────
-
 function RollforwardSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-12 w-80" />
-      <Skeleton className="h-72 w-full" />
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-52" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-11 w-80" />
+      <Skeleton className="h-72 w-full rounded-xl" />
     </div>
   );
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function RollforwardPage() {
   const [data, setData] = useState<RFData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Planning month selector (default = current month)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-
-  // Product filter from URL ?productId=X
   const [productId, setProductId] = useState<number | null>(null);
-
-  // Expanded rows
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const fetchData = useCallback(async (month: string) => {
@@ -101,7 +98,6 @@ export default function RollforwardPage() {
     fetchData(selectedMonth);
   }, [selectedMonth, fetchData]);
 
-  // Sync productId from URL param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("productId");
@@ -124,11 +120,13 @@ export default function RollforwardPage() {
   }
 
   if (loading) return <RollforwardSkeleton />;
-  if (error || !data) return <p className="text-red-600 p-4">{error}</p>;
+  if (error || !data) return <p className="text-destructive p-4">{error}</p>;
   if (data.results.length === 0) {
     return (
-      <div className="text-center py-16 text-slate-500">
-        <p className="text-lg">No rollforward data. Add products, stock, and forecasts first.</p>
+      <div className="text-center py-16">
+        <TrendingUp className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+        <p className="text-base font-medium text-foreground">No rollforward data</p>
+        <p className="text-sm text-muted-foreground mt-1">Add products, stock, and forecasts first.</p>
       </div>
     );
   }
@@ -137,21 +135,19 @@ export default function RollforwardPage() {
   const selected = data.results.find((r) => r.productId === productId) ?? data.results[0];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800">📈 Stock Rollforward</h1>
-          <p className="text-sm text-slate-500">
-            Balance = Current Stock + Incoming POs − Forecast per month
+          <h1 className="text-2xl font-bold text-foreground">Stock Rollforward</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Balance = Opening Stock + Incoming POs − Forecast
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Planning month selector */}
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-slate-600 font-medium">Planning:</label>
+            <label className="text-sm text-muted-foreground font-medium whitespace-nowrap">Planning month:</label>
             <select
-              className="border rounded px-3 py-1.5 text-sm font-medium bg-white"
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
             >
@@ -160,54 +156,87 @@ export default function RollforwardPage() {
               ))}
             </select>
           </div>
-          {/* Export */}
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            📥 Export Excel
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Export
           </Button>
         </div>
       </div>
 
-      {/* Product selector */}
-      <div className="flex gap-3 flex-wrap">
-        {data.results.map((r) => (
-          <button
-            key={r.productId}
-            onClick={() => { setProductId(r.productId); toggleExpand(r.productId); }}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              productId === r.productId
-                ? "bg-slate-800 text-white border-slate-800"
-                : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
-            }`}
-          >
-            {r.productName}
-          </button>
-        ))}
+      <div className="flex gap-2 flex-wrap">
+        {data.results.map((r) => {
+          const hasIssue = r.entries.some((e) => e.status === "stockout" || e.status === "critical");
+          const hasLow = r.entries.some((e) => e.status === "low");
+          const isActive = productId === r.productId;
+          return (
+            <button
+              key={r.productId}
+              onClick={() => { setProductId(r.productId); toggleExpand(r.productId); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-150 flex items-center gap-1.5 ${
+                isActive
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : hasIssue
+                  ? "bg-red-50 text-red-700 border-red-200 hover:border-red-400"
+                  : hasLow
+                  ? "bg-yellow-50 text-yellow-700 border-yellow-200 hover:border-yellow-400"
+                  : "bg-card text-foreground border-border hover:border-foreground/30"
+              }`}
+            >
+              {hasIssue && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+              {hasLow && !hasIssue && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />}
+              {r.productName}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Main rollforward grid */}
-      <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-base flex items-center gap-2">
-            <span className="font-semibold">{selected.productName}</span>
-            <span className="text-slate-400 font-normal text-sm">{selected.sku}</span>
-            <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">
+      {selected.entries.some((e) => e.status === "stockout") && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-700">{selected.productName} — Stockout Alert</p>
+            <div className="mt-1 space-y-0.5">
+              {selected.entries
+                .filter((e) => e.status === "stockout")
+                .map((e) => (
+                  <p key={e.month} className="text-sm text-red-600">
+                    Balance drops to <strong>{e.balance.toLocaleString()} units</strong> in {fmtMonth(e.month)}
+                  </p>
+                ))}
+            </div>
+          </div>
+          <Link href="/po-suggest">
+            <Button size="sm" variant="destructive" className="shrink-0 gap-1.5">
+              Create PO
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      <Card className="shadow-none">
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center gap-3 flex-wrap">
+            <CardTitle className="text-base font-semibold">{selected.productName}</CardTitle>
+            <span className="text-muted-foreground text-sm font-mono">{selected.sku}</span>
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-md text-muted-foreground">
               {selected.packingPerPallet} units/pallet
             </span>
-            <span className="ml-2 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-md">
               EXW €{selected.exwPriceEur}
             </span>
-          </CardTitle>
+          </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          <div className="overflow-x-auto">
+        <CardContent className="pt-4 p-0">
+          <div className="overflow-x-auto scrollbar-thin">
             <table className="min-w-[700px] w-full text-sm border-collapse">
               <thead>
-                <tr className="text-left text-slate-500 border-b">
-                  <th className="pb-2 pr-4 w-28 font-medium bg-white sticky left-0 z-10">Metric</th>
-                  {data.months.map((m) => (
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="p-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide w-32 sticky left-0 bg-muted/40 z-10">Metric</th>
+                  {data.months.map((m: string) => (
                     <th
                       key={m}
-                      className="pb-2 px-2 text-center font-medium min-w-[90px]"
+                      className="p-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide min-w-[92px]"
                     >
                       {fmtMonth(m)}
                     </th>
@@ -215,77 +244,74 @@ export default function RollforwardPage() {
                 </tr>
               </thead>
               <tbody>
-                {/* Current Stock — shown only in first month column */}
-                <tr className="border-b border-dashed">
-                  <td className="py-2 pr-4 font-medium text-slate-500 bg-white sticky left-0 z-10">
-                    Stock
+                <tr className="border-b border-border/60">
+                  <td className="p-3 font-medium text-muted-foreground bg-card sticky left-0 z-10 text-sm">
+                    Opening Stock
                   </td>
-                  {data.months.map((m, i) => (
-                    <td key={m} className="py-2 px-2 text-center text-slate-600">
+                  {data.months.map((m: string, i: number) => (
+                    <td key={m} className="p-3 text-center text-foreground">
                       {i === 0 ? (
-                        <span className="font-semibold text-slate-800">
+                        <span className="font-semibold text-foreground">
                           {selected.entries[0].currentStock.toLocaleString()}
                         </span>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </td>
                   ))}
                 </tr>
 
-                {/* + Incoming PO */}
-                <tr className="border-b border-dashed">
-                  <td className="py-2 pr-4 font-medium text-blue-700 bg-white sticky left-0 z-10">
+                <tr className="border-b border-border/60">
+                  <td className="p-3 font-medium text-primary bg-card sticky left-0 z-10 text-sm">
                     + Incoming PO
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className="py-2 px-2 text-center text-blue-700">
+                    <td key={i} className="p-3 text-center text-primary">
                       {e.incomingPOUnits > 0 ? (
-                        <span className="font-medium">+{e.incomingPOUnits.toLocaleString()}</span>
+                        <span className="font-semibold">+{e.incomingPOUnits.toLocaleString()}</span>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </td>
                   ))}
                 </tr>
 
-                {/* − Forecast */}
-                <tr className="border-b border-dashed">
-                  <td className="py-2 pr-4 font-medium text-red-700 bg-white sticky left-0 z-10">
+                <tr className="border-b border-border/60">
+                  <td className="p-3 font-medium text-destructive bg-card sticky left-0 z-10 text-sm">
                     − Forecast
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className="py-2 px-2 text-center text-red-600">
+                    <td key={i} className="p-3 text-center text-destructive">
                       {e.forecastUnits > 0 ? (
                         <span className="font-medium">−{e.forecastUnits.toLocaleString()}</span>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </td>
                   ))}
                 </tr>
 
-                {/* = Balance (colored) */}
-                <tr className="border-t-2 border-slate-300">
-                  <td className="pt-2 pb-1 pr-4 font-bold text-slate-800 bg-white sticky left-0 z-10">
+                <tr className="border-t-2 border-border">
+                  <td className="pt-3 pb-2 px-3 font-bold text-foreground bg-card sticky left-0 z-10">
                     = Balance
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className={`pt-2 pb-1 px-2 text-center font-bold ${STATUS_BG[e.status]}`}>
-                      {e.balance.toLocaleString()}
+                    <td key={i} className={`pt-3 pb-2 px-3 text-center font-bold ${STATUS_BG[e.status]}`}>
+                      <span className={e.balance < 0 ? "text-red-700" : "text-foreground"}>
+                        {e.balance.toLocaleString()}
+                      </span>
                     </td>
                   ))}
                 </tr>
 
-                {/* Status row */}
                 <tr>
-                  <td className="pt-1 pb-2 pr-4 font-medium text-slate-600 bg-white sticky left-0 z-10">
+                  <td className="pt-1 pb-3 px-3 font-medium text-muted-foreground bg-card sticky left-0 z-10 text-xs">
                     Status
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className={`pt-1 pb-2 px-2 text-center ${STATUS_BG[e.status]}`}>
-                      <Badge className={`${statusColors[e.status as StockStatus]} text-xs`}>
-                        {statusIcon[e.status as StockStatus]} {(e.status as StockStatus)}
+                    <td key={i} className={`pt-1 pb-3 px-3 text-center ${STATUS_BG[e.status]}`}>
+                      <Badge className={`${statusColors[e.status as StockStatus]} text-xs font-medium border-0`}>
+                        {e.status}
                       </Badge>
                     </td>
                   ))}
@@ -296,47 +322,57 @@ export default function RollforwardPage() {
         </CardContent>
       </Card>
 
-      {/* Expanded breakdown */}
       {expanded.has(selected.productId) && (
-        <Card className="border-blue-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600">
-              📊 Detail Breakdown — {selected.productName}
+        <Card className="border-primary/20 shadow-none">
+          <CardHeader className="pb-2 border-b">
+            <CardTitle className="text-sm text-foreground font-semibold">
+              Detail Breakdown — {selected.productName}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
+          <CardContent className="pt-4 p-0">
+            <div className="overflow-x-auto scrollbar-thin">
               <table className="min-w-[600px] w-full text-xs">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b">
-                    <th className="pb-1.5 pr-4 font-medium">Month</th>
-                    <th className="pb-1.5 px-2 text-right">Opening</th>
-                    <th className="pb-1.5 px-2 text-right">+ InPO</th>
-                    <th className="pb-1.5 px-2 text-right">− Forecast</th>
-                    <th className="pb-1.5 px-2 text-right">= Closing</th>
-                    <th className="pb-1.5 px-2 text-center">Status</th>
+                  <tr className="bg-muted/40 border-b border-border text-left">
+                    <th className="p-3 font-medium text-muted-foreground uppercase tracking-wide">Month</th>
+                    <th className="p-3 text-right font-medium text-muted-foreground uppercase tracking-wide">Opening</th>
+                    <th className="p-3 text-right font-medium text-muted-foreground uppercase tracking-wide">+ PO In</th>
+                    <th className="p-3 text-right font-medium text-muted-foreground uppercase tracking-wide">− Forecast</th>
+                    <th className="p-3 text-right font-medium text-muted-foreground uppercase tracking-wide">= Closing</th>
+                    <th className="p-3 text-center font-medium text-muted-foreground uppercase tracking-wide">Status</th>
+                    <th className="p-3 font-medium text-muted-foreground uppercase tracking-wide">Visual</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(() => {
-                    const opening = selected.entries[0].currentStock;
                     return selected.entries.map((e) => {
                       const closing = e.balance;
+                      const barWidth = Math.min(100, Math.max(0, (closing / (selected.entries[0].currentStock || 1)) * 100));
                       return (
-                        <tr key={e.month} className="border-b border-dashed">
-                          <td className="py-1.5 pr-4 font-medium">{fmtMonth(e.month)}</td>
-                          <td className="py-1.5 px-2 text-right text-slate-600">{opening.toLocaleString()}</td>
-                          <td className="py-1.5 px-2 text-right text-blue-600">
-                            {e.incomingPOUnits > 0 ? `+${e.incomingPOUnits.toLocaleString()}` : "—"}
+                        <tr key={e.month} className="border-b border-border/60 hover:bg-muted/20 transition-colors">
+                          <td className="p-3 font-medium text-foreground">{fmtMonth(e.month)}</td>
+                          <td className="p-3 text-right text-foreground">{e.currentStock.toLocaleString()}</td>
+                          <td className="p-3 text-right text-primary">
+                            {e.incomingPOUnits > 0 ? `+${e.incomingPOUnits.toLocaleString()}` : <span className="text-muted-foreground/40">—</span>}
                           </td>
-                          <td className="py-1.5 px-2 text-right text-red-500">
-                            {e.forecastUnits > 0 ? `−${e.forecastUnits.toLocaleString()}` : "—"}
+                          <td className="p-3 text-right text-destructive">
+                            {e.forecastUnits > 0 ? `−${e.forecastUnits.toLocaleString()}` : <span className="text-muted-foreground/40">—</span>}
                           </td>
-                          <td className={`py-1.5 px-2 text-right font-semibold ${STATUS_BG[e.status]}`}>
-                            {closing.toLocaleString()}
+                          <td className={`p-3 text-right font-semibold ${STATUS_BG[e.status]}`}>
+                            <span className={closing < 0 ? "text-red-700" : "text-foreground"}>
+                              {closing.toLocaleString()}
+                            </span>
                           </td>
-                          <td className={`py-1.5 px-2 text-center ${STATUS_BG[e.status]}`}>
-                            <Badge className={`${statusColors[e.status as StockStatus]} text-xs`}>{e.status}</Badge>
+                          <td className={`p-3 text-center ${STATUS_BG[e.status]}`}>
+                            <Badge className={`${statusColors[e.status as StockStatus]} text-xs border-0`}>{e.status}</Badge>
+                          </td>
+                          <td className="p-3 w-24">
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${STATUS_BAR[e.status]} transition-all`}
+                                style={{ width: `${Math.max(2, barWidth)}%` }}
+                              />
+                            </div>
                           </td>
                         </tr>
                       );
@@ -345,23 +381,6 @@ export default function RollforwardPage() {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stockout alert */}
-      {selected.entries.some((e) => e.status === "stockout") && (
-        <Card className="border-red-300 bg-red-50">
-          <CardContent className="py-3 space-y-1">
-            {selected.entries
-              .filter((e) => e.status === "stockout")
-              .map((e) => (
-                <p key={e.month} className="text-red-700 text-sm">
-                  ⚠️ <strong>STOCKOUT in {fmtMonth(e.month)}:</strong> Balance drops to{" "}
-                  <strong>{e.balance.toLocaleString()} units</strong>.
-                  Order now — 5-month lead time means arrival in {fmtMonth(e.month)}.
-                </p>
-              ))}
           </CardContent>
         </Card>
       )}

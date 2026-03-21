@@ -6,14 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { exportForecasts, type ForecastRow } from "@/lib/export";
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { FileSpreadsheet, ListFilter as Filter, X, Save, CheckCheck, ClipboardList } from "lucide-react";
 
 type Product = { id: number; name: string; sku: string };
 type Customer = { id: number; name: string; region: string };
-type ForecastMap = Record<string, number>; // key: `${customerId}:${productId}:${month}`
-
-// ── Constants ────────────────────────────────────────────────────────────────
+type ForecastMap = Record<string, number>;
 
 const MONTHS = Array.from({ length: 8 }, (_, i) => {
   const d = new Date(2026, 3 + i, 1);
@@ -26,21 +23,20 @@ function fmtMonth(ym: string): string {
   return `${names[parseInt(m ?? "1", 10)]} ${y}`;
 }
 
-// ── Skeleton ────────────────────────────────────────────────────────────────
-
 function ForecastsSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      <Skeleton className="h-8 w-56" />
-      <div className="flex gap-3">
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-40" />)}
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-44" />
+        <Skeleton className="h-4 w-64" />
       </div>
-      <Skeleton className="h-96 w-full rounded-md" />
+      <div className="flex gap-3">
+        {[1, 2].map((i) => <Skeleton key={i} className="h-9 w-44" />)}
+      </div>
+      <Skeleton className="h-96 w-full rounded-xl" />
     </div>
   );
 }
-
-// ── Debounced input cell ─────────────────────────────────────────────────────
 
 interface CellProps {
   value: number;
@@ -54,7 +50,6 @@ function DebouncedCell({ value, customerId, productId, month, onSave }: CellProp
   const [localValue, setLocalValue] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Sync when API confirms
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
@@ -69,7 +64,6 @@ function DebouncedCell({ value, customerId, productId, month, onSave }: CellProp
   }
 
   function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
-    // Force save on blur too (in case user leaves without typing more)
     clearTimeout(timerRef.current);
     const parsed = parseInt(e.target.value, 10) || 0;
     onSave(customerId, productId, month, parsed);
@@ -79,17 +73,15 @@ function DebouncedCell({ value, customerId, productId, month, onSave }: CellProp
     <input
       type="number"
       min={0}
-      className="w-full p-1 text-center text-sm border border-transparent rounded
-                 hover:border-border focus:border-blue-500 focus:outline-none
-                 focus:ring-1 focus:ring-blue-400 focus:bg-white bg-transparent transition-colors"
+      className="w-full px-1 py-1.5 text-center text-sm border border-transparent rounded-md
+                 hover:border-border focus:border-primary focus:outline-none
+                 focus:ring-1 focus:ring-primary/30 focus:bg-white bg-transparent transition-colors"
       value={localValue}
       onChange={handleChange}
       onBlur={handleBlur}
     />
   );
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ForecastsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -137,7 +129,6 @@ export default function ForecastsPage() {
     }
   }
 
-  // ── Filtered data ──
   const filteredProducts = filterProduct
     ? products.filter((p) => String(p.id) === filterProduct)
     : products;
@@ -145,7 +136,6 @@ export default function ForecastsPage() {
     ? customers.filter((c) => String(c.id) === filterCustomer)
     : customers;
 
-  // ── Row total per (customer, product) ──
   function rowTotal(customerId: number, productId: number): number {
     return MONTHS.reduce(
       (sum, m) => sum + (forecasts[`${customerId}:${productId}:${m}`] ?? 0),
@@ -153,7 +143,6 @@ export default function ForecastsPage() {
     );
   }
 
-  // ── Column total per month ──
   function colTotal(month: string): number {
     return filteredCustomers.reduce(
       (sum, c) =>
@@ -162,15 +151,8 @@ export default function ForecastsPage() {
     );
   }
 
-  // ── Grand total ──
   const grandTotal = MONTHS.reduce((s, m) => s + colTotal(m), 0);
 
-  // ── Row total per customer across all months ──
-  function customerTotal(customerId: number): number {
-    return filteredProducts.reduce((sum, p) => sum + rowTotal(customerId, p.id), 0);
-  }
-
-  // ── Export ──
   function handleExport() {
     const rows: ForecastRow[] = filteredCustomers.flatMap((c) =>
       filteredProducts.map((p) => {
@@ -194,33 +176,41 @@ export default function ForecastsPage() {
   if (loading) return <ForecastsSkeleton />;
 
   const hasData = filteredProducts.length > 0 && filteredCustomers.length > 0;
+  const hasFilters = !!(filterProduct || filterCustomer);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800">📋 Forecast Entry</h1>
-          <p className="text-sm text-slate-500">Apr 2026 – Nov 2026 · Debounced save (500ms)</p>
+          <h1 className="text-2xl font-bold text-foreground">Forecast Entry</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Apr 2026 – Nov 2026 · Auto-saved</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Saving indicator */}
-          {savingCount > 0 && (
-            <span className="text-xs text-blue-600 animate-pulse">Saving…</span>
-          )}
-          {savingCount === 0 && lastSaved && (
-            <span className="text-xs text-green-600">Saved at {lastSaved}</span>
-          )}
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            📥 Export Excel
+        <div className="flex items-center gap-2.5">
+          {savingCount > 0 ? (
+            <span className="flex items-center gap-1.5 text-xs text-primary font-medium">
+              <Save className="w-3.5 h-3.5 animate-pulse" />
+              Saving…
+            </span>
+          ) : lastSaved ? (
+            <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+              <CheckCheck className="w-3.5 h-3.5" />
+              Saved {lastSaved}
+            </span>
+          ) : null}
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Export Excel
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap items-center">
+      <div className="flex gap-2.5 flex-wrap items-center">
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Filter className="w-3.5 h-3.5" />
+          <span>Filter:</span>
+        </div>
         <select
-          className="border rounded px-3 py-1.5 text-sm bg-white"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
           value={filterProduct}
           onChange={(e) => setFilterProduct(e.target.value)}
         >
@@ -232,7 +222,7 @@ export default function ForecastsPage() {
           ))}
         </select>
         <select
-          className="border rounded px-3 py-1.5 text-sm bg-white"
+          className="border border-border rounded-lg px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
           value={filterCustomer}
           onChange={(e) => setFilterCustomer(e.target.value)}
         >
@@ -243,112 +233,120 @@ export default function ForecastsPage() {
             </option>
           ))}
         </select>
-        {(filterProduct || filterCustomer) && (
+        {hasFilters && (
           <button
-            className="text-sm text-blue-600 hover:underline"
+            className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
             onClick={() => { setFilterProduct(""); setFilterCustomer(""); }}
           >
-            Clear filters
+            <X className="w-3.5 h-3.5" />
+            Clear
           </button>
         )}
       </div>
 
-      {/* Grid */}
       {!hasData ? (
         <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-slate-500">
-            <p className="text-lg font-medium">No data available.</p>
-            <p className="text-sm mt-1 text-slate-400">
-              Run <code className="bg-slate-100 px-1 rounded">npx tsx scripts/seed-products.ts</code> to seed data.
+          <CardContent className="py-12 text-center">
+            <ClipboardList className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-base font-medium text-foreground">No data available</p>
+            <p className="text-sm mt-1 text-muted-foreground">
+              Run <code className="bg-muted px-1.5 py-0.5 rounded text-xs">npx tsx scripts/seed-products.ts</code> to seed data.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="p-2 text-left font-medium text-slate-700 border-b w-44 sticky left-0 bg-slate-100 z-10 z-20">
-                  Customer
-                </th>
-                <th className="p-2 text-left font-medium text-slate-700 border-b w-44">
-                  Product
-                </th>
-                {MONTHS.map((m) => (
-                  <th
-                    key={m}
-                    className="p-2 text-center font-medium text-slate-700 border-b w-20"
-                  >
-                    {fmtMonth(m)}
+        <>
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-none scrollbar-thin">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="p-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide w-40 sticky left-0 bg-muted/50 z-20">
+                    Customer
                   </th>
-                ))}
-                <th className="p-2 text-center font-medium text-slate-700 border-b w-16 bg-slate-50">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.map((c) =>
-                filteredProducts.map((p) => {
-                  const total = rowTotal(c.id, p.id);
-                  return (
-                    <tr
-                      key={`${c.id}:${p.id}`}
-                      className="border-b last:border-0 hover:bg-slate-50 transition-colors"
+                  <th className="p-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide w-44">
+                    Product
+                  </th>
+                  {MONTHS.map((m) => (
+                    <th
+                      key={m}
+                      className="p-3 text-center font-medium text-muted-foreground text-xs uppercase tracking-wide w-20 min-w-[76px]"
                     >
-                      <td className="p-2 text-slate-600 text-xs sticky left-0 bg-white z-10">
-                        {c.name}
-                        <span className="ml-1 text-[10px] bg-slate-100 text-slate-500 px-1 rounded">
-                          {c.region}
-                        </span>
-                      </td>
-                      <td className="p-2 font-medium text-slate-800 text-xs">{p.name}</td>
-                      {MONTHS.map((m) => (
-                        <td key={m} className="p-1 border-l text-center">
-                          <DebouncedCell
-                            value={forecasts[`${c.id}:${p.id}:${m}`] ?? 0}
-                            customerId={c.id}
-                            productId={p.id}
-                            month={m}
-                            onSave={saveForecast}
-                          />
+                      {fmtMonth(m)}
+                    </th>
+                  ))}
+                  <th className="p-3 text-center font-medium text-muted-foreground text-xs uppercase tracking-wide w-16 bg-muted/70">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((c) =>
+                  filteredProducts.map((p, pi) => {
+                    const total = rowTotal(c.id, p.id);
+                    const isFirstProductOfCustomer = pi === 0;
+                    return (
+                      <tr
+                        key={`${c.id}:${p.id}`}
+                        className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors"
+                      >
+                        <td className="p-3 sticky left-0 bg-card z-10 border-r border-border/40">
+                          {isFirstProductOfCustomer && (
+                            <div>
+                              <span className="text-sm font-medium text-foreground">{c.name}</span>
+                              <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                                {c.region}
+                              </span>
+                            </div>
+                          )}
                         </td>
-                      ))}
-                      <td className="p-2 text-center font-semibold bg-slate-50 text-slate-800 border-l">
-                        {total > 0 ? total.toLocaleString() : "—"}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        <td className="p-3 font-medium text-foreground text-xs">{p.name}</td>
+                        {MONTHS.map((m) => (
+                          <td key={m} className="p-1 border-l border-border/40 text-center">
+                            <DebouncedCell
+                              value={forecasts[`${c.id}:${p.id}:${m}`] ?? 0}
+                              customerId={c.id}
+                              productId={p.id}
+                              month={m}
+                              onSave={saveForecast}
+                            />
+                          </td>
+                        ))}
+                        <td className="p-3 text-center font-semibold bg-muted/30 text-foreground border-l border-border/40 text-xs">
+                          {total > 0 ? total.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
 
-              {/* Column totals row */}
-              <tr className="bg-slate-200 font-semibold text-slate-800 border-t-2 border-slate-400">
-                <td className="p-2 sticky left-0 bg-slate-200 z-10" colSpan={2}>
-                  Column Total
-                </td>
-                {MONTHS.map((m) => (
-                  <td key={m} className="p-2 text-center border-l">
-                    {colTotal(m) > 0 ? colTotal(m).toLocaleString() : "—"}
+                <tr className="bg-muted/60 font-semibold text-foreground border-t-2 border-border">
+                  <td className="p-3 sticky left-0 bg-muted/60 z-10 text-xs uppercase tracking-wide text-muted-foreground" colSpan={2}>
+                    Monthly Total
                   </td>
-                ))}
-                <td className="p-2 text-center bg-slate-100 border-l">
-                  {grandTotal > 0 ? grandTotal.toLocaleString() : "—"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+                  {MONTHS.map((m) => (
+                    <td key={m} className="p-3 text-center border-l border-border/40 text-sm">
+                      {colTotal(m) > 0 ? (
+                        <span className="font-semibold text-foreground">{colTotal(m).toLocaleString()}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="p-3 text-center bg-muted/80 border-l border-border/40 text-sm font-bold text-primary">
+                    {grandTotal > 0 ? grandTotal.toLocaleString() : "—"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      {/* Summary chips */}
-      {hasData && (
-        <div className="flex gap-4 text-xs text-slate-500">
-          <span>Products: <strong className="text-slate-700">{filteredProducts.length}</strong></span>
-          <span>Customers: <strong className="text-slate-700">{filteredCustomers.length}</strong></span>
-          <span>Rows: <strong className="text-slate-700">{filteredProducts.length * filteredCustomers.length}</strong></span>
-          <span>Grand Total: <strong className="text-slate-700">{grandTotal.toLocaleString()}</strong></span>
-        </div>
+          <div className="flex gap-5 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2.5">
+            <span>Products: <strong className="text-foreground">{filteredProducts.length}</strong></span>
+            <span>Customers: <strong className="text-foreground">{filteredCustomers.length}</strong></span>
+            <span>Rows: <strong className="text-foreground">{filteredProducts.length * filteredCustomers.length}</strong></span>
+            <span className="ml-auto">Grand Total: <strong className="text-foreground">{grandTotal.toLocaleString()}</strong></span>
+          </div>
+        </>
       )}
     </div>
   );
