@@ -1,0 +1,25 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts (if any at root level)
+dist/
+build/
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude agent state (should not be committed)
+.claude/
