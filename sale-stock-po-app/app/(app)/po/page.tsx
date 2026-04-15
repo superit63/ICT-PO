@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { exportPOList } from "@/lib/export-po";
-import { FileSpreadsheet, Plus, Package, Eye, Pencil, Trash2, PackageOpen } from "lucide-react";
+import { FileSpreadsheet, Plus, Package, Eye, Trash2, PackageOpen } from "lucide-react";
 
 type PO = {
   id: number; po_number: string; status: string;
@@ -43,13 +43,6 @@ function fmtDate(d: string) {
   return `${names[parseInt(mo ?? "1")]} ${parseInt(day ?? "1")}, ${y}`;
 }
 
-function computeValue(po: PO): number {
-  if (po.exw_price_eur && po.packing_per_pallet && po.qty_pallets) {
-    return po.qty_pallets * po.packing_per_pallet * po.exw_price_eur;
-  }
-  return 0;
-}
-
 export default function POPage() {
   const router = useRouter();
   const [allPOs, setAllPOs] = useState<PO[]>([]);
@@ -73,9 +66,6 @@ export default function POPage() {
   // Group by status tab
   const byStatus = (status: string) =>
     Object.values(grouped).filter(({ po }) => po.status === status);
-
-  const totalValue = (pos: { po: PO; items: PO[] }[]) =>
-    pos.reduce((sum, { po }) => sum + computeValue(po), 0);
 
   async function handleDelete(id: number, poNumber: string) {
     try {
@@ -101,10 +91,17 @@ export default function POPage() {
       arrival_month: fmt(po.arrival_month),
       items_summary: items.map((i) => `${i.product_name} (${i.qty_pallets} pallets)`).join("; "),
       total_pallets: items.reduce((s, i) => s + (i.qty_pallets ?? 0), 0),
-      po_value_eur: computeValue(po),
+      po_value_eur: items.reduce(
+        (sum, item) => sum + (item.qty_pallets ?? 0) * (item.packing_per_pallet ?? 1) * (item.exw_price_eur ?? 0),
+        0
+      ),
     })), "purchase-orders.xlsx");
     toast.success("PO list exported");
     setExporting(false);
+  }
+
+  function handleOpen(id: number) {
+    router.push(`/po/${id}`);
   }
 
   const tabList = (
@@ -169,13 +166,13 @@ export default function POPage() {
 
           {(["all"] as const).map((tab) => (
             <TabsContent key={tab} value={tab} className="space-y-3">
-              <POListView pos={Object.values(grouped)} onDelete={handleDelete} />
+              <POListView pos={Object.values(grouped)} onDelete={handleDelete} onOpen={handleOpen} />
             </TabsContent>
           ))}
 
           {ALL_STATUSES.map((s) => (
             <TabsContent key={s} value={s} className="space-y-3">
-              <POListView pos={byStatus(s)} onDelete={handleDelete} />
+              <POListView pos={byStatus(s)} onDelete={handleDelete} onOpen={handleOpen} />
             </TabsContent>
           ))}
         </Tabs>
@@ -184,7 +181,15 @@ export default function POPage() {
   );
 }
 
-function POListView({ pos, onDelete }: { pos: { po: PO; items: PO[] }[]; onDelete: (id: number, poNumber: string) => void }) {
+function POListView({
+  pos,
+  onDelete,
+  onOpen,
+}: {
+  pos: { po: PO; items: PO[] }[];
+  onDelete: (id: number, poNumber: string) => void;
+  onOpen: (id: number) => void;
+}) {
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   if (pos.length === 0) {
@@ -217,7 +222,7 @@ function POListView({ pos, onDelete }: { pos: { po: PO; items: PO[] }[]; onDelet
               <tbody className="divide-y divide-border">
                 {pos.map(({ po, items }) => (
                   <tr key={po.id} className="hover:bg-muted/20 transition-colors cursor-pointer"
-                    onClick={() => window.location.href = `/po/${po.id}`}>
+                    onClick={() => onOpen(po.id)}>
                     <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">{po.po_number}</td>
                     <td className="px-3 py-3 text-foreground">{fmtDate(po.order_date)}</td>
                     <td className="px-3 py-3 text-foreground">{fmt(po.arrival_month)}</td>
@@ -275,7 +280,7 @@ function POListView({ pos, onDelete }: { pos: { po: PO; items: PO[] }[]; onDelet
       <div className="md:hidden space-y-3">
         {pos.map(({ po, items }) => (
           <Card key={po.id} className="shadow-none hover:shadow-sm transition-shadow cursor-pointer"
-            onClick={() => window.location.href = `/po/${po.id}`}>
+            onClick={() => onOpen(po.id)}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const res = NextResponse.json({ ok: true });
-    res.cookies.set("session_pin", "1", {
+    res.cookies.set("session_pin", record.value, {
       httpOnly: true,
       sameSite: "strict",
       secure: process.env.NODE_ENV === "production",

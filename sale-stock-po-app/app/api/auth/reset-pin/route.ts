@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { queryOne, executeSql } from "@/lib/db";
+import { executeSql } from "@/lib/db";
+import { hasValidRequestSession } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
-  const cookie = req.cookies.get("session_pin");
-  if (!cookie?.value) {
+  if (!(await hasValidRequestSession(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -20,7 +20,15 @@ export async function POST(req: NextRequest) {
       [hash]
     );
 
-    return NextResponse.json({ ok: true });
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set("session_pin", hash, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    });
+    return res;
   } catch (err) {
     console.error("[auth/reset-pin]", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

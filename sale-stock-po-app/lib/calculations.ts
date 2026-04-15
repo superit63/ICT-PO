@@ -71,10 +71,10 @@ export function getStatus(balance: Units, packing: number): StockStatus {
 
 /** Status badge color class names (Tailwind). */
 export const statusColors: Record<StockStatus, string> = {
-  ok: "bg-green-100 text-green-800",
-  low: "bg-yellow-100 text-yellow-800",
-  critical: "bg-orange-100 text-orange-800",
-  stockout: "bg-red-100 text-red-800",
+  ok: "bg-success/12 text-success dark:bg-success/18",
+  low: "bg-warning/14 text-warning dark:bg-warning/20",
+  critical: "bg-critical/14 text-critical dark:bg-critical/20",
+  stockout: "bg-destructive/12 text-destructive dark:bg-destructive/20",
 };
 
 /** Status icon (emoji). */

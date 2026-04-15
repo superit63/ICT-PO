@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryAll, executeSql, queryOne } from "@/lib/db";
+import { hasValidRequestSession } from "@/lib/session";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 export async function GET(req: NextRequest) {
-  const cookie = req.cookies.get("session_pin");
-  if (!cookie?.value) return unauthorized();
+  if (!(await hasValidRequestSession(req))) return unauthorized();
   const { searchParams } = new URL(req.url);
   const statuses = searchParams.getAll("status").filter(Boolean);
   let sql = `SELECT po.*, pi.id as item_id, pi.product_id, pi.qty_pallets,
@@ -27,8 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const cookie = req.cookies.get("session_pin");
-  if (!cookie?.value) return unauthorized();
+  if (!(await hasValidRequestSession(req))) return unauthorized();
   try {
     const { po_number, order_date, arrival_month, notes, items } = await req.json();
     if (!po_number || !order_date || !arrival_month || !items?.length) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryAll, executeSql, queryOne } from "@/lib/db";
+import { hasValidRequestSession } from "@/lib/session";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -7,8 +8,7 @@ function unauthorized() {
 
 /** GET /api/forecasts?productId=&customerId=&month= */
 export async function GET(req: NextRequest) {
-  const cookie = req.cookies.get("session_pin");
-  if (!cookie?.value) return unauthorized();
+  if (!(await hasValidRequestSession(req))) return unauthorized();
   const { searchParams } = new URL(req.url);
   const productId = searchParams.get("productId");
   const customerId = searchParams.get("customerId");
@@ -30,8 +30,7 @@ export async function GET(req: NextRequest) {
  * Body: { customer_id, product_id, month, qty_units }[]  OR single object
  */
 export async function POST(req: NextRequest) {
-  const cookie = req.cookies.get("session_pin");
-  if (!cookie?.value) return unauthorized();
+  if (!(await hasValidRequestSession(req))) return unauthorized();
   try {
     const body = await req.json();
     const items = Array.isArray(body) ? body : [body];

@@ -116,7 +116,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Backup */}
-      <Card className="shadow-none">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Database className="w-4 h-4 text-primary" />
@@ -143,18 +143,21 @@ export default function SettingsPage() {
                   onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
                   className="text-sm"
                 />
-                <Button type="submit" variant="destructive" disabled={!importFile} className="gap-2 shrink-0">
+                <Button type="submit" variant="outline" disabled className="gap-2 shrink-0">
                   <Upload className="w-4 h-4" />
-                  Restore
+                  Restore (coming soon)
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Restore remains disabled until the import flow is implemented safely end-to-end.
+              </p>
             </form>
           </div>
         </CardContent>
       </Card>
 
       {/* PIN change */}
-      <Card className="shadow-none">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />
@@ -207,7 +210,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* App info */}
-      <Card className="shadow-none">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Info className="w-4 h-4 text-primary" />

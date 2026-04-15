@@ -11,15 +11,6 @@ import { formatMonth, statusColors, type StockStatus } from "@/lib/calculations"
 import { FileSpreadsheet, TriangleAlert as AlertTriangle, ArrowRight, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
-type RFEntry = {
-  month: string;
-  currentStock: number;
-  incomingPOUnits: number;
-  forecastUnits: number;
-  balance: number;
-  status: StockStatus;
-};
-
 type RFData = {
   planningMonth: string;
   months: string[];
@@ -30,19 +21,40 @@ function fmtMonth(ym: string): string {
   return formatMonth(ym as `20${number}-${number}${number}`);
 }
 
-const STATUS_BG: Record<string, string> = {
-  ok: "bg-green-50",
-  low: "bg-yellow-50",
-  critical: "bg-orange-50",
-  stockout: "bg-red-50",
+const STATUS_BG: Record<StockStatus, string> = {
+  ok: "bg-success/8 dark:bg-success/12",
+  low: "bg-warning/10 dark:bg-warning/14",
+  critical: "bg-critical/10 dark:bg-critical/14",
+  stockout: "bg-destructive/10 dark:bg-destructive/14",
 };
 
-const STATUS_BAR: Record<string, string> = {
-  ok: "bg-green-400",
-  low: "bg-yellow-400",
-  critical: "bg-orange-400",
-  stockout: "bg-red-500",
+const STATUS_BAR: Record<StockStatus, string> = {
+  ok: "bg-success",
+  low: "bg-warning",
+  critical: "bg-critical",
+  stockout: "bg-destructive",
 };
+
+const STATUS_BUTTON: Record<StockStatus, string> = {
+  ok: "bg-card text-foreground border-border hover:border-foreground/30",
+  low: "bg-warning/10 text-warning border-warning/20 hover:border-warning/40 dark:bg-warning/14",
+  critical: "bg-critical/10 text-critical border-critical/20 hover:border-critical/40 dark:bg-critical/14",
+  stockout: "bg-destructive/10 text-destructive border-destructive/20 hover:border-destructive/40 dark:bg-destructive/16",
+};
+
+const STATUS_DOT: Record<StockStatus, string> = {
+  ok: "bg-success",
+  low: "bg-warning",
+  critical: "bg-critical",
+  stockout: "bg-destructive",
+};
+
+function getProductStatus(entries: RfResult["entries"]): StockStatus {
+  if (entries.some((entry) => entry.status === "stockout")) return "stockout";
+  if (entries.some((entry) => entry.status === "critical")) return "critical";
+  if (entries.some((entry) => entry.status === "low")) return "low";
+  return "ok";
+}
 
 function buildMonthOptions(current: string): string[] {
   const [y, m] = current.split("-").map(Number);
@@ -92,7 +104,7 @@ export default function RollforwardPage() {
     } finally {
       setLoading(false);
     }
-  }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [productId]);
 
   useEffect(() => {
     fetchData(selectedMonth);
@@ -145,8 +157,11 @@ export default function RollforwardPage() {
         </div>
         <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground font-medium whitespace-nowrap">Planning month:</label>
+            <label htmlFor="planning-month" className="text-sm text-muted-foreground font-medium whitespace-nowrap">
+              Planning month:
+            </label>
             <select
+              id="planning-month"
               className="border border-border rounded-lg px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
@@ -165,9 +180,8 @@ export default function RollforwardPage() {
 
       <div className="flex gap-2 flex-wrap">
         {data.results.map((r) => {
-          const hasIssue = r.entries.some((e) => e.status === "stockout" || e.status === "critical");
-          const hasLow = r.entries.some((e) => e.status === "low");
           const isActive = productId === r.productId;
+          const productStatus = getProductStatus(r.entries);
           return (
             <button
               key={r.productId}
@@ -175,15 +189,12 @@ export default function RollforwardPage() {
               className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-150 flex items-center gap-1.5 ${
                 isActive
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : hasIssue
-                  ? "bg-red-50 text-red-700 border-red-200 hover:border-red-400"
-                  : hasLow
-                  ? "bg-yellow-50 text-yellow-700 border-yellow-200 hover:border-yellow-400"
-                  : "bg-card text-foreground border-border hover:border-foreground/30"
+                  : STATUS_BUTTON[productStatus]
               }`}
             >
-              {hasIssue && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
-              {hasLow && !hasIssue && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />}
+              {productStatus !== "ok" && !isActive && (
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[productStatus]}`} />
+              )}
               {r.productName}
             </button>
           );
@@ -191,15 +202,15 @@ export default function RollforwardPage() {
       </div>
 
       {selected.entries.some((e) => e.status === "stockout") && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-destructive/20 bg-destructive/8 px-4 py-3 flex items-start gap-3 dark:bg-destructive/12">
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-red-700">{selected.productName} — Stockout Alert</p>
+            <p className="text-sm font-semibold text-destructive">{selected.productName} — Stockout Alert</p>
             <div className="mt-1 space-y-0.5">
               {selected.entries
                 .filter((e) => e.status === "stockout")
                 .map((e) => (
-                  <p key={e.month} className="text-sm text-red-600">
+                  <p key={e.month} className="text-sm text-destructive">
                     Balance drops to <strong>{e.balance.toLocaleString()} units</strong> in {fmtMonth(e.month)}
                   </p>
                 ))}
@@ -219,10 +230,10 @@ export default function RollforwardPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <CardTitle className="text-base font-semibold">{selected.productName}</CardTitle>
             <span className="text-muted-foreground text-sm font-mono">{selected.sku}</span>
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-md text-muted-foreground">
+            <span className="rounded-md bg-primary/8 px-2 py-0.5 text-xs text-primary">
               {selected.packingPerPallet} units/pallet
             </span>
-            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-md">
+            <span className="rounded-md bg-primary/8 px-2 py-0.5 text-xs text-primary">
               EXW €{selected.exwPriceEur}
             </span>
           </div>
@@ -296,8 +307,8 @@ export default function RollforwardPage() {
                     = Balance
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className={`pt-3 pb-2 px-3 text-center font-bold ${STATUS_BG[e.status]}`}>
-                      <span className={e.balance < 0 ? "text-red-700" : "text-foreground"}>
+                    <td key={i} className={`pt-3 pb-2 px-3 text-center font-bold ${STATUS_BG[e.status as StockStatus]}`}>
+                      <span className={e.balance < 0 ? "text-destructive" : "text-foreground"}>
                         {e.balance.toLocaleString()}
                       </span>
                     </td>
@@ -309,7 +320,7 @@ export default function RollforwardPage() {
                     Status
                   </td>
                   {selected.entries.map((e, i) => (
-                    <td key={i} className={`pt-1 pb-3 px-3 text-center ${STATUS_BG[e.status]}`}>
+                    <td key={i} className={`pt-1 pb-3 px-3 text-center ${STATUS_BG[e.status as StockStatus]}`}>
                       <Badge className={`${statusColors[e.status as StockStatus]} text-xs font-medium border-0`}>
                         {e.status}
                       </Badge>
@@ -358,18 +369,18 @@ export default function RollforwardPage() {
                           <td className="p-3 text-right text-destructive">
                             {e.forecastUnits > 0 ? `−${e.forecastUnits.toLocaleString()}` : <span className="text-muted-foreground/40">—</span>}
                           </td>
-                          <td className={`p-3 text-right font-semibold ${STATUS_BG[e.status]}`}>
-                            <span className={closing < 0 ? "text-red-700" : "text-foreground"}>
+                          <td className={`p-3 text-right font-semibold ${STATUS_BG[e.status as StockStatus]}`}>
+                            <span className={closing < 0 ? "text-destructive" : "text-foreground"}>
                               {closing.toLocaleString()}
                             </span>
                           </td>
-                          <td className={`p-3 text-center ${STATUS_BG[e.status]}`}>
+                          <td className={`p-3 text-center ${STATUS_BG[e.status as StockStatus]}`}>
                             <Badge className={`${statusColors[e.status as StockStatus]} text-xs border-0`}>{e.status}</Badge>
                           </td>
                           <td className="p-3 w-24">
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full ${STATUS_BAR[e.status]} transition-all`}
+                                className={`h-full rounded-full ${STATUS_BAR[e.status as StockStatus]} transition-all`}
                                 style={{ width: `${Math.max(2, barWidth)}%` }}
                               />
                             </div>

@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   title: "Sale-Stock-PO | ICT-PO",
-  description: "Exeol sale/stock/PO management for ICT-Pharmaceutical",
+  description: "Operational dashboard for pharmaceutical sales, stock, and purchase orders.",
 };
 
 export default function RootLayout({
@@ -24,8 +26,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`${inter.variable} ${plexMono.variable} h-full antialiased`}>
+      <body className="min-h-full text-foreground">
+        <a
+          href="#main-content"
+          className="sr-only absolute left-4 top-4 z-[100] rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg focus:not-sr-only"
+        >
+          Skip to main content
+        </a>
         {children}
         <Toaster position="top-center" />
       </body>

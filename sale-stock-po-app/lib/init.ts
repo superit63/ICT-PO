@@ -4,6 +4,9 @@
  */
 import { getDbClient } from "@/lib/db";
 
+let initPromise: Promise<void> | null = null;
+let hasInitialized = false;
+
 // Inline schema to avoid ?raw import issues with TypeScript
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS app_config (
@@ -41,6 +44,21 @@ CREATE TABLE IF NOT EXISTS stock (
   qty_units INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT DEFAULT (date('now'))
 );
+CREATE TABLE IF NOT EXISTS stock_adjustments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stock_id INTEGER REFERENCES stock(id) ON DELETE SET NULL,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  lot_number TEXT,
+  expiry_date TEXT,
+  change_type TEXT NOT NULL,
+  reason TEXT,
+  qty_delta INTEGER NOT NULL DEFAULT 0,
+  previous_qty INTEGER,
+  next_qty INTEGER,
+  reference_type TEXT,
+  reference_id TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   po_number TEXT UNIQUE NOT NULL,
@@ -60,6 +78,8 @@ CREATE INDEX IF NOT EXISTS idx_forecasts_product_month ON forecasts(product_id, 
 CREATE INDEX IF NOT EXISTS idx_forecasts_customer ON forecasts(customer_id);
 CREATE INDEX IF NOT EXISTS idx_forecasts_month ON forecasts(month);
 CREATE INDEX IF NOT EXISTS idx_stock_product ON stock(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product_created ON stock_adjustments(product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_stock ON stock_adjustments(stock_id);
 CREATE INDEX IF NOT EXISTS idx_po_items_po ON po_items(po_id);
 CREATE INDEX IF NOT EXISTS idx_po_items_product ON po_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_arrival ON purchase_orders(arrival_month);
@@ -67,15 +87,26 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status)
 `.trim();
 
 export async function initDb() {
-  try {
-    const db = getDbClient();
-    const statements = SCHEMA.split(";").map((s: string) => s.trim()).filter(Boolean);
-    for (const stmt of statements) {
-      await db.execute({ sql: stmt });
+  if (hasInitialized) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      const db = getDbClient();
+      const statements = SCHEMA.split(";").map((s: string) => s.trim()).filter(Boolean);
+      for (const stmt of statements) {
+        await db.execute({ sql: stmt });
+      }
+      hasInitialized = true;
+      if (process.env.NEXT_PHASE !== "phase-production-build") {
+        console.log("[initDb] Schema applied successfully");
+      }
+    } catch (err) {
+      initPromise = null;
+      console.error("[initDb] Migration failed:", err);
+      throw err;
     }
-    console.log("[initDb] Schema applied successfully");
-  } catch (err) {
-    console.error("[initDb] Migration failed:", err);
-    throw err;
-  }
+  })();
+
+  return initPromise;
 }

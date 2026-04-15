@@ -26,6 +26,40 @@ function fmt(ym: string) {
   return `${names[parseInt(m ?? "1")]} ${y ?? ""}`;
 }
 
+const URGENCY_STYLES = {
+  critical: {
+    card: "bg-destructive/8 border-destructive/20 dark:bg-destructive/12",
+    value: "text-destructive",
+    label: "text-destructive/80",
+    iconWrap: "bg-destructive/12",
+    icon: "text-destructive",
+    badge: "bg-destructive/12 text-destructive",
+    sectionTitle: "text-destructive",
+    sectionBadge: "bg-destructive/12 text-destructive",
+    border: "border-l-destructive/70 border-destructive/20",
+  },
+  warning: {
+    card: "bg-warning/10 border-warning/20 dark:bg-warning/14",
+    value: "text-warning",
+    label: "text-warning/80",
+    iconWrap: "bg-warning/14",
+    icon: "text-warning",
+    badge: "bg-warning/14 text-warning",
+    sectionTitle: "text-warning",
+    sectionBadge: "bg-warning/14 text-warning",
+    border: "border-l-warning/70 border-warning/20",
+  },
+} as const;
+
+const SAFE_STYLES = {
+  card: "border-success/20 bg-success/8 dark:bg-success/12",
+  iconWrap: "bg-success/12",
+  icon: "text-success",
+  title: "text-success",
+  body: "text-success/80",
+  link: "text-success hover:text-success/80",
+} as const;
+
 function POSuggestContent() {
   const router = useRouter();
   const params = useSearchParams();
@@ -101,7 +135,7 @@ function POSuggestContent() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {prefillProductId && (
-            <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50 font-medium">
+            <Badge variant="outline" className="border-warning/20 bg-warning/10 text-warning font-medium">
               Pre-filled from suggestion
             </Badge>
           )}
@@ -114,28 +148,28 @@ function POSuggestContent() {
 
       {suggestions.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-red-50 border-red-200 shadow-none">
+          <Card className={`shadow-none ${URGENCY_STYLES.critical.card}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-red-700">{critical.length}</p>
-                  <p className="text-xs font-medium text-red-600 mt-0.5">Critical</p>
+                  <p className={`text-2xl font-bold ${URGENCY_STYLES.critical.value}`}>{critical.length}</p>
+                  <p className={`text-xs font-medium mt-0.5 ${URGENCY_STYLES.critical.label}`}>Critical</p>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${URGENCY_STYLES.critical.iconWrap}`}>
+                  <AlertTriangle className={`w-4 h-4 ${URGENCY_STYLES.critical.icon}`} />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-yellow-50 border-yellow-200 shadow-none">
+          <Card className={`shadow-none ${URGENCY_STYLES.warning.card}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-yellow-700">{warning.length}</p>
-                  <p className="text-xs font-medium text-yellow-600 mt-0.5">Warning</p>
+                  <p className={`text-2xl font-bold ${URGENCY_STYLES.warning.value}`}>{warning.length}</p>
+                  <p className={`text-xs font-medium mt-0.5 ${URGENCY_STYLES.warning.label}`}>Warning</p>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4 text-yellow-600" />
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${URGENCY_STYLES.warning.iconWrap}`}>
+                  <AlertCircle className={`w-4 h-4 ${URGENCY_STYLES.warning.icon}`} />
                 </div>
               </div>
             </CardContent>
@@ -159,14 +193,14 @@ function POSuggestContent() {
       )}
 
       {suggestions.length === 0 && (
-        <Card className="border-green-200 bg-green-50 shadow-none">
+        <Card className={`shadow-none ${SAFE_STYLES.card}`}>
           <CardContent className="py-12 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${SAFE_STYLES.iconWrap}`}>
+              <CheckCircle2 className={`w-6 h-6 ${SAFE_STYLES.icon}`} />
             </div>
-            <p className="text-base font-semibold text-green-800">All products adequately stocked</p>
-            <p className="text-sm text-green-700">No purchase orders needed for the next 8 months.</p>
-            <Link href="/rollforward" className="inline-flex items-center gap-1.5 text-sm text-green-700 font-medium hover:underline">
+            <p className={`text-base font-semibold ${SAFE_STYLES.title}`}>All products adequately stocked</p>
+            <p className={`text-sm ${SAFE_STYLES.body}`}>No purchase orders needed for the next 8 months.</p>
+            <Link href="/rollforward" className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${SAFE_STYLES.link}`}>
               View rollforward details
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -177,9 +211,9 @@ function POSuggestContent() {
       {critical.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-            <h2 className="text-base font-semibold text-red-700">Order Now — Critical</h2>
-            <Badge className="bg-red-600 text-white text-xs border-0">{critical.length}</Badge>
+            <AlertTriangle className={`w-4 h-4 ${URGENCY_STYLES.critical.icon}`} />
+            <h2 className={`text-base font-semibold ${URGENCY_STYLES.critical.sectionTitle}`}>Order Now — Critical</h2>
+            <Badge className={`text-xs border-0 ${URGENCY_STYLES.critical.sectionBadge}`}>{critical.length}</Badge>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {critical.map((s) => (
@@ -192,9 +226,9 @@ function POSuggestContent() {
       {warning.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2.5">
-            <Lightbulb className="w-4 h-4 text-yellow-600" />
-            <h2 className="text-base font-semibold text-yellow-700">Plan Soon — Warning</h2>
-            <Badge className="bg-yellow-500 text-white text-xs border-0">{warning.length}</Badge>
+            <Lightbulb className={`w-4 h-4 ${URGENCY_STYLES.warning.icon}`} />
+            <h2 className={`text-base font-semibold ${URGENCY_STYLES.warning.sectionTitle}`}>Plan Soon — Warning</h2>
+            <Badge className={`text-xs border-0 ${URGENCY_STYLES.warning.sectionBadge}`}>{warning.length}</Badge>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {warning.map((s) => (
@@ -209,17 +243,17 @@ function POSuggestContent() {
 
 function SuggestionCard({ s, onCreatePO }: { s: POSuggestion; onCreatePO: (s: POSuggestion) => void }) {
   const overshoot = s.palletsNeeded * s.packingPerPallet - s.shortfallUnits;
-  const isCritical = s.urgency === "critical";
+  const tone = URGENCY_STYLES[s.urgency];
 
   return (
-    <Card className={`shadow-none border-l-4 ${isCritical ? "border-l-red-500 border-red-200" : "border-l-yellow-400 border-yellow-200"}`}>
+    <Card className={`shadow-none border-l-4 ${tone.border}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <CardTitle className="text-sm font-semibold text-foreground truncate">{s.productName}</CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">{s.sku} · {s.packingPerPallet} u/pallet · €{s.exwPriceEur.toFixed(3)}/unit</p>
           </div>
-          <Badge className={`shrink-0 text-xs border-0 font-semibold ${isCritical ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+          <Badge className={`shrink-0 text-xs border-0 font-semibold ${tone.badge}`}>
             {s.urgency.toUpperCase()}
           </Badge>
         </div>
@@ -227,7 +261,7 @@ function SuggestionCard({ s, onCreatePO }: { s: POSuggestion; onCreatePO: (s: PO
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "First Stockout", value: fmt(s.firstStockoutMonth), color: isCritical ? "text-red-700" : "text-yellow-700" },
+            { label: "First Stockout", value: fmt(s.firstStockoutMonth), color: tone.value },
             { label: "Shortfall", value: `${s.shortfallUnits.toLocaleString()} units`, color: "text-destructive" },
             { label: "Pallets Needed", value: `${s.palletsNeeded} pallets`, color: "text-foreground" },
             { label: "PO Value", value: `€${s.poValueEur.toLocaleString("en-EU", { minimumFractionDigits: 2 })}`, color: "text-primary" },
@@ -239,7 +273,7 @@ function SuggestionCard({ s, onCreatePO }: { s: POSuggestion; onCreatePO: (s: PO
           ))}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
           <Package className="w-3.5 h-3.5 shrink-0" />
           <span>{s.containerConfig === "mixed" ? "Multiple containers needed (>44 pallets)" : `1 × ${s.containerConfig}-pallet container`}</span>
           {overshoot > 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,14 +91,30 @@ export default function PODetailPage() {
   const [showReceive, setShowReceive] = useState(false);
   const [lotEntries, setLotEntries] = useState<LotEntry[]>([]);
   const [receiveError, setReceiveError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
-  function loadPO() {
+  const loadPO = useCallback(() => {
+    setLoading(true);
     fetch(`/api/po/${id}`)
-      .then((r) => r.json())
-      .then((d) => { setPO(d); setLoading(false); });
-  }
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load purchase order");
+        }
 
-  useEffect(() => { loadPO(); }, [id]);
+        const data = await response.json();
+        setPO(data);
+        setLoadError("");
+      })
+      .catch(() => {
+        setPO(null);
+        setLoadError("Failed to load purchase order. Please try again.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [id]);
+
+  useEffect(() => { loadPO(); }, [loadPO]);
 
   useEffect(() => {
     if (!showReceive || !po) return;
@@ -195,6 +211,7 @@ export default function PODetailPage() {
     </div>
   );
 
+  if (loadError) return <p className="text-destructive">{loadError}</p>;
   if (!po) return <p className="text-destructive">PO not found.</p>;
 
   const totalUnits = po.items.reduce((s, i) => s + i.qty_pallets * i.packing_per_pallet, 0);
