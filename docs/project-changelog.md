@@ -1,5 +1,28 @@
 # Project Changelog — Sale-Stock-PO
 
+## v1.0.0-maintenance — 2026-05-05
+
+### Added
+- API reference documentation for 15 current Next.js route files.
+- Vitest + React Testing Library test infrastructure.
+- Playwright E2E infrastructure and GitHub Actions test workflow.
+- Unit tests for calculations, utilities, session helpers, and Button UI primitive.
+- E2E tests for auth, dashboard navigation, and master-data CRUD flows.
+- Testing strategy and contributing guide.
+- Safe `.env.local.example` template.
+
+### Changed
+- Archived completed/obsolete app plan directories under `sale-stock-po-app/plans/archive/`.
+- Updated README documentation and testing links.
+- Normalized `next.config.ts` to a single typed config export.
+- Excluded Playwright specs from Vitest collection and ran Playwright serially for SQLite-backed dev tests.
+
+### Validation
+- `npm run test -- --run` passed: 43 tests.
+- `npm run test:coverage -- --run` passed.
+- `npm run test:e2e` passed: 9 tests.
+- `npx tsc --noEmit --pretty false` passed.
+
 ## v1.0.0 — 2026-03-19
 
 ### Added
