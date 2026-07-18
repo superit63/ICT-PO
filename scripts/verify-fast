@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+if [[ ! -x sale-stock-po-app/node_modules/.bin/eslint ]]; then
+  echo "verify-fast: local sale-stock-po-app dependencies are unavailable" >&2
+  exit 2
+fi
+npm --prefix sale-stock-po-app run lint
